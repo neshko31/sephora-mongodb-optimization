@@ -1,0 +1,1 @@
+# Rad nad optimizovanom shemom baze podataka

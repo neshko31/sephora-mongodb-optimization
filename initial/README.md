@@ -1,0 +1,1 @@
+# Rad nad inicijalnom shemom baze podataka
