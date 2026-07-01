@@ -1,0 +1,495 @@
+// Upit 1, plan izvrsavanja
+// Pokrenuto sa: db.product_info.explain("executionStats").aggregate(...);
+
+{
+    "explainVersion" : "1",
+    "stages" : [
+        {
+            "$cursor" : {
+                "queryPlanner" : {
+                    "namespace" : "SBP-Projekat-initial.product_info",
+                    "parsedQuery" : {
+
+                    },
+                    "indexFilterSet" : false,
+                    "queryHash" : "24E66E71",
+                    "planCacheShapeHash" : "24E66E71",
+                    "planCacheKey" : "32F35A25",
+                    "optimizationTimeMillis" : 0.0,
+                    "maxIndexedOrSolutionsReached" : false,
+                    "maxIndexedAndSolutionsReached" : false,
+                    "maxScansToExplodeReached" : false,
+                    "prunedSimilarIndexes" : false,
+                    "winningPlan" : {
+                        "isCached" : false,
+                        "stage" : "LIMIT",
+                        "limitAmount" : 500.0,
+                        "inputStage" : {
+                            "stage" : "PROJECTION_SIMPLE",
+                            "transformBy" : {
+                                "highlights" : 1.0,
+                                "loves_count" : 1.0,
+                                "price_usd" : 1.0,
+                                "product_id" : 1.0,
+                                "rating" : 1.0,
+                                "_id" : 0.0
+                            },
+                            "inputStage" : {
+                                "stage" : "COLLSCAN",
+                                "direction" : "forward"
+                            }
+                        }
+                    },
+                    "rejectedPlans" : [
+
+                    ]
+                },
+                "executionStats" : {
+                    "executionSuccess" : true,
+                    "nReturned" : 500.0,
+                    "executionTimeMillis" : 680334.0,
+                    "totalKeysExamined" : 0.0,
+                    "totalDocsExamined" : 500.0,
+                    "executionStages" : {
+                        "isCached" : false,
+                        "stage" : "LIMIT",
+                        "nReturned" : 500.0,
+                        "executionTimeMillisEstimate" : 0.0,
+                        "works" : 501.0,
+                        "advanced" : 500.0,
+                        "needTime" : 0.0,
+                        "needYield" : 0.0,
+                        "saveState" : 1.0,
+                        "restoreState" : 1.0,
+                        "isEOF" : 1.0,
+                        "limitAmount" : 500.0,
+                        "inputStage" : {
+                            "stage" : "PROJECTION_SIMPLE",
+                            "nReturned" : 500.0,
+                            "executionTimeMillisEstimate" : 0.0,
+                            "works" : 500.0,
+                            "advanced" : 500.0,
+                            "needTime" : 0.0,
+                            "needYield" : 0.0,
+                            "saveState" : 1.0,
+                            "restoreState" : 1.0,
+                            "isEOF" : 0.0,
+                            "transformBy" : {
+                                "highlights" : 1.0,
+                                "loves_count" : 1.0,
+                                "price_usd" : 1.0,
+                                "product_id" : 1.0,
+                                "rating" : 1.0,
+                                "_id" : 0.0
+                            },
+                            "inputStage" : {
+                                "stage" : "COLLSCAN",
+                                "nReturned" : 500.0,
+                                "executionTimeMillisEstimate" : 0.0,
+                                "works" : 500.0,
+                                "advanced" : 500.0,
+                                "needTime" : 0.0,
+                                "needYield" : 0.0,
+                                "saveState" : 1.0,
+                                "restoreState" : 1.0,
+                                "isEOF" : 0.0,
+                                "direction" : "forward",
+                                "docsExamined" : 500.0
+                            }
+                        }
+                    }
+                }
+            },
+            "nReturned" : NumberLong(500),
+            "executionTimeMillisEstimate" : NumberLong(6)
+        },
+        {
+            "$addFields" : {
+                "is_vegan" : {
+                    "$in" : [
+                        {
+                            "$const" : "Vegan"
+                        },
+                        "$highlights"
+                    ]
+                },
+                "is_clean_positive" : {
+                    "$in" : [
+                        {
+                            "$const" : "Clean + Planet Positive"
+                        },
+                        "$highlights"
+                    ]
+                }
+            },
+            "nReturned" : NumberLong(500),
+            "executionTimeMillisEstimate" : NumberLong(6)
+        },
+        {
+            "$addFields" : {
+                "product_highlight" : {
+                    "$switch" : {
+                        "branches" : [
+                            {
+                                "case" : {
+                                    "$and" : [
+                                        {
+                                            "$eq" : [
+                                                "$is_vegan",
+                                                {
+                                                    "$const" : true
+                                                }
+                                            ]
+                                        },
+                                        {
+                                            "$eq" : [
+                                                "$is_clean_positive",
+                                                {
+                                                    "$const" : true
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                },
+                                "then" : {
+                                    "$const" : "Both"
+                                }
+                            },
+                            {
+                                "case" : {
+                                    "$eq" : [
+                                        "$is_vegan",
+                                        {
+                                            "$const" : true
+                                        }
+                                    ]
+                                },
+                                "then" : {
+                                    "$const" : "Vegan"
+                                }
+                            },
+                            {
+                                "case" : {
+                                    "$eq" : [
+                                        "$is_clean_positive",
+                                        {
+                                            "$const" : true
+                                        }
+                                    ]
+                                },
+                                "then" : {
+                                    "$const" : "Clean + Planet Positive"
+                                }
+                            }
+                        ],
+                        "default" : {
+                            "$const" : "Standard"
+                        }
+                    }
+                }
+            },
+            "nReturned" : NumberLong(500),
+            "executionTimeMillisEstimate" : NumberLong(6)
+        },
+        {
+            "$lookup" : {
+                "from" : "reviews",
+                "as" : "product_reviews",
+                "localField" : "product_id",
+                "foreignField" : "product_id",
+                "let" : {
+
+                },
+                "pipeline" : [
+                    {
+                        "$group" : {
+                            "_id" : null,
+                            "broj_recenzija_proizvoda" : {
+                                "$sum" : 1.0
+                            },
+                            "broj_preporuka_proizvoda" : {
+                                "$sum" : {
+                                    "$cond" : [
+                                        "$is_recommended",
+                                        1.0,
+                                        0.0
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "totalDocsExamined" : NumberLong(547205500),
+            "totalKeysExamined" : NumberLong(0),
+            "collectionScans" : NumberLong(500),
+            "indexesUsed" : [
+
+            ],
+            "nReturned" : NumberLong(500),
+            "executionTimeMillisEstimate" : NumberLong(680302)
+        },
+        {
+            "$match" : {
+                "$expr" : {
+                    "$gt" : [
+                        {
+                            "$size" : [
+                                "$product_reviews"
+                            ]
+                        },
+                        {
+                            "$const" : 0.0
+                        }
+                    ]
+                }
+            },
+            "nReturned" : NumberLong(96),
+            "executionTimeMillisEstimate" : NumberLong(680302)
+        },
+        {
+            "$group" : {
+                "_id" : "$product_highlight",
+                "broj_proizvoda" : {
+                    "$sum" : {
+                        "$const" : 1.0
+                    }
+                },
+                "prosecna_cena_usd" : {
+                    "$avg" : "$price_usd"
+                },
+                "prosecan_loves_count" : {
+                    "$avg" : "$loves_count"
+                },
+                "prosecan_rating" : {
+                    "$avg" : "$rating"
+                },
+                "ukupno_recenzija" : {
+                    "$sum" : "$product_reviews.0.broj_recenzija_proizvoda"
+                },
+                "broj_preporuka" : {
+                    "$sum" : "$product_reviews.0.broj_preporuka_proizvoda"
+                }
+            },
+            "maxAccumulatorMemoryUsageBytes" : {
+                "broj_proizvoda" : NumberLong(384),
+                "prosecna_cena_usd" : NumberLong(312),
+                "prosecan_loves_count" : NumberLong(312),
+                "prosecan_rating" : NumberLong(312),
+                "ukupno_recenzija" : NumberLong(384),
+                "broj_preporuka" : NumberLong(384)
+            },
+            "totalOutputDataSizeBytes" : NumberLong(1934),
+            "usedDisk" : false,
+            "spills" : NumberLong(0),
+            "spilledDataStorageSize" : NumberLong(0),
+            "numBytesSpilledEstimate" : NumberLong(0),
+            "spilledRecords" : NumberLong(0),
+            "nReturned" : NumberLong(3),
+            "executionTimeMillisEstimate" : NumberLong(680302)
+        },
+        {
+            "$sort" : {
+                "sortKey" : {
+                    "prosecna_cena_usd" : -1.0
+                }
+            },
+            "totalDataSizeSortedBytesEstimate" : NumberLong(1958),
+            "usedDisk" : false,
+            "spills" : NumberLong(0),
+            "spilledDataStorageSize" : NumberLong(0),
+            "nReturned" : NumberLong(3),
+            "executionTimeMillisEstimate" : NumberLong(680302)
+        },
+        {
+            "$project" : {
+                "broj_proizvoda" : true,
+                "prosecna_cena_usd" : true,
+                "prosecan_loves_count" : true,
+                "prosecan_rating" : true,
+                "ukupno_recenzija" : true,
+                "broj_preporuka" : true,
+                "product_highlight" : "$_id",
+                "_id" : false
+            },
+            "nReturned" : NumberLong(3),
+            "executionTimeMillisEstimate" : NumberLong(680302)
+        }
+    ],
+    "queryShapeHash" : "443074972F6093A6F53CFB0C22DAD37AB712BF7D5C54A75C105BB0F0F9266112",
+    "serverInfo" : {
+        "host" : "Laptop",
+        "port" : 27017.0,
+        "version" : "8.0.26",
+        "gitVersion" : "a2c24805265db119cc39f2f54e067b4294a4ddd2"
+    },
+    "serverParameters" : {
+        "internalQueryFacetBufferSizeBytes" : 104857600.0,
+        "internalQueryFacetMaxOutputDocSizeBytes" : 104857600.0,
+        "internalLookupStageIntermediateDocumentMaxSizeBytes" : 104857600.0,
+        "internalDocumentSourceGroupMaxMemoryBytes" : 104857600.0,
+        "internalQueryMaxBlockingSortMemoryUsageBytes" : 104857600.0,
+        "internalQueryProhibitBlockingMergeOnMongoS" : 0.0,
+        "internalQueryMaxAddToSetBytes" : 104857600.0,
+        "internalDocumentSourceSetWindowFieldsMaxMemoryBytes" : 104857600.0,
+        "internalQueryFrameworkControl" : "trySbeRestricted",
+        "internalQueryPlannerIgnoreIndexWithCollationForRegex" : 1.0
+    },
+    "command" : {
+        "aggregate" : "product_info",
+        "pipeline" : [
+            {
+                "$addFields" : {
+                    "is_vegan" : {
+                        "$in" : [
+                            "Vegan",
+                            "$highlights"
+                        ]
+                    },
+                    "is_clean_positive" : {
+                        "$in" : [
+                            "Clean + Planet Positive",
+                            "$highlights"
+                        ]
+                    }
+                }
+            },
+            {
+                "$addFields" : {
+                    "product_highlight" : {
+                        "$switch" : {
+                            "branches" : [
+                                {
+                                    "case" : {
+                                        "$and" : [
+                                            {
+                                                "$eq" : [
+                                                    "$is_vegan",
+                                                    true
+                                                ]
+                                            },
+                                            {
+                                                "$eq" : [
+                                                    "$is_clean_positive",
+                                                    true
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "then" : "Both"
+                                },
+                                {
+                                    "case" : {
+                                        "$eq" : [
+                                            "$is_vegan",
+                                            true
+                                        ]
+                                    },
+                                    "then" : "Vegan"
+                                },
+                                {
+                                    "case" : {
+                                        "$eq" : [
+                                            "$is_clean_positive",
+                                            true
+                                        ]
+                                    },
+                                    "then" : "Clean + Planet Positive"
+                                }
+                            ],
+                            "default" : "Standard"
+                        }
+                    }
+                }
+            },
+            {
+                "$limit" : 500.0
+            },
+            {
+                "$lookup" : {
+                    "from" : "reviews",
+                    "localField" : "product_id",
+                    "foreignField" : "product_id",
+                    "as" : "product_reviews",
+                    "pipeline" : [
+                        {
+                            "$group" : {
+                                "_id" : null,
+                                "broj_recenzija_proizvoda" : {
+                                    "$sum" : 1.0
+                                },
+                                "broj_preporuka_proizvoda" : {
+                                    "$sum" : {
+                                        "$cond" : [
+                                            "$is_recommended",
+                                            1.0,
+                                            0.0
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                "$match" : {
+                    "$expr" : {
+                        "$gt" : [
+                            {
+                                "$size" : "$product_reviews"
+                            },
+                            0.0
+                        ]
+                    }
+                }
+            },
+            {
+                "$group" : {
+                    "_id" : "$product_highlight",
+                    "broj_proizvoda" : {
+                        "$sum" : 1.0
+                    },
+                    "prosecna_cena_usd" : {
+                        "$avg" : "$price_usd"
+                    },
+                    "prosecan_loves_count" : {
+                        "$avg" : "$loves_count"
+                    },
+                    "prosecan_rating" : {
+                        "$avg" : "$rating"
+                    },
+                    "ukupno_recenzija" : {
+                        "$sum" : "$product_reviews.0.broj_recenzija_proizvoda"
+                    },
+                    "broj_preporuka" : {
+                        "$sum" : "$product_reviews.0.broj_preporuka_proizvoda"
+                    }
+                }
+            },
+            {
+                "$sort" : {
+                    "prosecna_cena_usd" : -1.0
+                }
+            },
+            {
+                "$project" : {
+                    "_id" : 0.0,
+                    "product_highlight" : "$_id",
+                    "broj_proizvoda" : 1.0,
+                    "prosecna_cena_usd" : 1.0,
+                    "prosecan_loves_count" : 1.0,
+                    "prosecan_rating" : 1.0,
+                    "ukupno_recenzija" : 1.0,
+                    "broj_preporuka" : 1.0
+                }
+            }
+        ],
+        "allowDiskUse" : true,
+        "cursor" : {
+
+        },
+        "$db" : "SBP-Projekat-initial"
+    },
+    "ok" : 1.0
+}
