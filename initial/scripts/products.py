@@ -124,11 +124,18 @@ def to_list(value):
     if not isinstance(parsed, list):
         parsed = [parsed]
 
-    if len(parsed) == 1 and isinstance(parsed[0], str) and ',' in parsed[0]:
-        parts = [p.strip() for p in parsed[0].split(',')]
-        return [p for p in parts if p != '']
-
-    return [str(p).strip() for p in parsed if str(p).strip() != '']
+    result = []
+    for p in parsed:
+        s = str(p).strip()
+        if s == '':
+            continue
+        if ',' in s:
+            parts = [part.strip() for part in s.split(',')]
+            result.extend(part for part in parts if part != '')
+        else:
+            result.append(s)
+            
+    return result
 
 
 def _chunked(items, size):
