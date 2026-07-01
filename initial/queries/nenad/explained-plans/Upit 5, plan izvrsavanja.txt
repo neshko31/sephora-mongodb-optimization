@@ -1,3 +1,3 @@
-// Upit 1, plan izvrsavanja
+// Upit 5, plan izvrsavanja
 // Pokrenuto sa: db.product_info.explain("executionStats").aggregate(...);
 
