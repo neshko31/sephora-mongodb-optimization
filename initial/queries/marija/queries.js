@@ -62,6 +62,7 @@ db.reviews.aggregate([
 
 
 
+
 //Upit2
 db.reviews.aggregate([
   {
@@ -101,4 +102,105 @@ db.reviews.aggregate([
 
 
 
+
 // Upit 3
+db.reviews.aggregate([
+  {
+    $addFields: {
+      reviewLength: { $strLenCP: { $ifNull: ["$review_text", ""] } }
+    }
+  },
+  {
+    $match: {
+      $expr: {
+        $and: [
+          { $gt: ["$reviewLength", 300] },
+          { $ne: ["$rating", 5] },
+          { $gt: ["$helpfulness", 0] }
+        ]
+      }
+    }
+  },
+  { $limit: 100 },   
+  {
+    $lookup: {
+      from: "reviews",
+      let: { pid: "$product_id", myAuthor: "$author_id" },
+      pipeline: [
+        { $match: { $expr: { $eq: ["$product_id", "$$pid"] } } }
+      ],
+      as: "sameProductReviews"
+    }
+  },
+  {
+    $addFields: {
+      productAvgHelpfulness: { $avg: "$sameProductReviews.helpfulness" },
+      relativeHelpfulness: {
+        $subtract: [
+          { $ifNull: ["$helpfulness", 0] },
+          { $avg: "$sameProductReviews.helpfulness" }
+        ]
+      }
+    }
+  },
+  {
+    $group: {
+      _id: "$author_id",
+      avgHelpfulness: { $avg: "$helpfulness" },
+      avgRelativeHelpfulness: { $avg: "$relativeHelpfulness" },
+      totalReviews: { $sum: 1 }
+    }
+  },
+  { $sort: { avgRelativeHelpfulness: -1 } }
+], { allowDiskUse: true });
+
+
+
+
+
+
+// Upit 4
+db.reviews.aggregate([
+  {
+    $addFields: {
+      isConfusing: {
+        $and: [
+          { $in: ["$rating", [4, 5]] },
+          { $eq: ["$is_recommended", false] }
+        ]
+      }
+    }
+  },
+  { $match: { isConfusing: true } },
+  {
+    $group: {
+      _id: "$product_id",
+      confusingCount: { $sum: 1 },
+      examples: { $push: "$review_text" }
+    }
+  },
+  {
+    $lookup: {
+      from: "product_info",
+      localField: "_id",
+      foreignField: "product_id",
+      as: "product"
+    }
+  },
+  { $unwind: "$product" },
+  {
+    $project: {
+      productName: "$product.product_name",
+      brand: "$product.brand_name",
+      confusingCount: 1
+    }
+  },
+  { $sort: { confusingCount: -1 } }
+], { allowDiskUse: true });
+
+
+
+
+
+
+// Upit 5

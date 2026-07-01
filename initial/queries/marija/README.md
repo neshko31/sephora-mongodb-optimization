@@ -133,34 +133,121 @@ Performanse:
 
 Tekst upita: Kritičari od poverenja - Želimo da izolujemo autore čije recenzije zajednica smatra izuzetno
 korisnim (helpfulness), a koji pišu detaljne opise (duže od 300 karaktera) i ne daju olako ocene 5.
+Za svakog izdvojenog autora računamo "relativni rang korisnosti" odnosno koliko je njegova specifično recenzija korisnija
+u poređenju sa prosekom svih ostalih recenzija istog proizvoda. Na taj način identifikujemo autore koji značajno nadmašuju
+ostale recezente.
 
 Kod upita: 
 ``` 
-
+db.reviews.aggregate([
+  {
+    $addFields: {
+      reviewLength: { $strLenCP: { $ifNull: ["$review_text", ""] } }
+    }
+  },
+  {
+    $match: {
+      $expr: {
+        $and: [
+          { $gt: ["$reviewLength", 300] },
+          { $ne: ["$rating", 5] },
+          { $gt: ["$helpfulness", 0] }
+        ]
+      }
+    }
+  },
+  { $limit: 100 },   
+  {
+    $lookup: {
+      from: "reviews",
+      let: { pid: "$product_id", myAuthor: "$author_id" },
+      pipeline: [
+        { $match: { $expr: { $eq: ["$product_id", "$$pid"] } } }
+      ],
+      as: "sameProductReviews"
+    }
+  },
+  {
+    $addFields: {
+      productAvgHelpfulness: { $avg: "$sameProductReviews.helpfulness" },
+      relativeHelpfulness: {
+        $subtract: [
+          { $ifNull: ["$helpfulness", 0] },
+          { $avg: "$sameProductReviews.helpfulness" }
+        ]
+      }
+    }
+  },
+  {
+    $group: {
+      _id: "$author_id",
+      avgHelpfulness: { $avg: "$helpfulness" },
+      avgRelativeHelpfulness: { $avg: "$relativeHelpfulness" },
+      totalReviews: { $sum: 1 }
+    }
+  },
+  { $sort: { avgRelativeHelpfulness: -1 } }
+], { allowDiskUse: true });
 ```
 Rezultat upita: slika3.1
 
 Performanse:
-- Vreme trajanja upita: s
+- Vreme trajanja upita:  [ (3min i 40s) x ________  ] s                --- 3min i 40s potrebno za limit od 100 dokumenata
 - Uocavanje uskih grla
 - Prikaz explain naredbe - slika3.2
 
 
 ## Upit 4:
 
-Tekst upita: Detekcija anomalija preporuka - Tražimo recenzije gde je korisnik dao loše ocene, 1 ili 2, a
-polje is_recommended je označeno sa 1 (preporučuje proizvod). Želimo da vidimo koji proizvodi imaju
+Tekst upita: Detekcija anomalija preporuka - Tražimo recenzije gde je korisnik dao dobre ocene, 4 ili 5, a
+polje is_recommended je označeno sa false (ne preporučuje proizvod). Želimo da vidimo koji proizvodi imaju
 najviše ovakvih zbunjujućih recenzija. 
 
 Kod upita: 
 ``` 
-
+db.reviews.aggregate([
+  {
+    $addFields: {
+      isConfusing: {
+        $and: [
+          { $in: ["$rating", [4, 5]] },
+          { $eq: ["$is_recommended", false] }
+        ]
+      }
+    }
+  },
+  { $match: { isConfusing: true } },
+  {
+    $group: {
+      _id: "$product_id",
+      confusingCount: { $sum: 1 },
+      examples: { $push: "$review_text" }
+    }
+  },
+  {
+    $lookup: {
+      from: "product_info",
+      localField: "_id",
+      foreignField: "product_id",
+      as: "product"
+    }
+  },
+  { $unwind: "$product" },
+  {
+    $project: {
+      productName: "$product.product_name",
+      brand: "$product.brand_name",
+      confusingCount: 1
+    }
+  },
+  { $sort: { confusingCount: -1 } }
+], { allowDiskUse: true });
 ```
 
 Rezultat upita: slika4.1
 
 Performanse:
-- Vreme trajanja upita: s
+- Vreme trajanja upita: 1min 1s
 - Uocavanje uskih grla
 - Prikaz explain naredbe - slika4.2
 
