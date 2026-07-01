@@ -108,7 +108,7 @@ def to_bool(value):
     value = none_if_empty(value)
     if value is None:
         return False
-    return value.strip().lower() in ('1', 'true')
+    return value.strip().lower() in ('1', 'true', '1.0')
 
 
 def to_list(value):

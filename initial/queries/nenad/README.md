@@ -73,8 +73,8 @@ db.getCollection("product_info").aggregate([
             "prosecna_cena_usd": { $avg: "$price_usd" },
             "prosecan_loves_count": { $avg: "$loves_count" },
             "prosecan_rating": { $avg: "$rating" },
-            "ukupno_recenzija": { $sum: "$product_reviews.broj_recenzija_proizvoda" },
-            "broj_preporuka": { $sum: "$product_reviews.broj_preporuka_proizvoda" }
+            "ukupno_recenzija": { $sum: { $sum: "$product_reviews.broj_recenzija_proizvoda" } },
+            "broj_preporuka": { $sum: { $sum: "$product_reviews.broj_preporuka_proizvoda" } }
         }
     },
     {
