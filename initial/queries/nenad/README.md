@@ -245,10 +245,95 @@ Uočavanje uskih grla:
 ## Upit 3 
 
 ### Tekst upita: 
-Strategija popusta - Koji brendovi najagresivnije koriste popuste (najveća razlika između price_usd i sale_price_usd) i da li su ti popusti rezervisani samo za Limited Edition proizvode? 
+Analiza menjanja mišljenja - Kako se kretala prosečna ocena po godinama od prve recenzije za 20 najpopularnijih proizvoda koji pripadaju ‘Skincare’ primarnoj kategoriji po broju recenzija, s tim da se posmatraju samo proizvodi koji sigurno imaju recenzije?
 
 ### Kod upita: 
 ``` 
+db.getCollection("product_info").aggregate([
+    {
+        // Faza 1: izdvajanje samo Skincare proizvoda iz razloga sto su recenzije u skupu samo za njih vezane
+        $match: { "primary_category": "Skincare" }
+    },
+    {
+        // Faza 2: spajanje sa reviews kolekcijom kako bi se moglo pratiti kroz vreme
+        $lookup: {
+            from: "reviews",
+            localField: "product_id",
+            foreignField: "product_id",
+            as: "product_reviews",
+            pipeline: [
+                {
+                    $project: {
+                        "_id": 1,
+                        "rating_review": "$rating",
+                        "review_year": { $year: "$submission_time" }
+                    }
+                }
+            ]
+        }
+    },
+    {
+        // Faza 3: garantovanje da sami vec izvuceni proizvodi imaju recenzije
+        $match: {
+            $expr: { $gt: [{ $size: "$product_reviews" }, 0] }
+        }
+    },
+    {
+        // Faza 4: racunanje stvarnog broja reviews
+        $addFields: {
+            "reviews_count": { $size: "$product_reviews" }
+        }
+    },
+    {
+        // Faza 5: sortiranje proizvoda na osnovu broja reviews
+        $sort: {
+            "reviews_count": -1
+        }
+    },
+    {
+        // Faza 6: izdvajanje top 20 proizvoda na osnovu broja reviews
+        $limit: 20
+    },
+    {
+        // Faza 7: rastavljanje na zasebne dokumente kako bi se moglo kasnije uraditi grupisanje
+        $unwind: "$product_reviews"
+    },
+    {
+        // Faza 8: grupisanje proizvoda na osnovu samog product_id i godine kad je nastala recenzija
+        $group: {
+            "_id": {
+                "product_id": "$product_id",
+                "year": "$product_reviews.review_year"
+            },
+            "avg_rating": { $avg: "$product_reviews.rating_review" },
+            "product_name": { $first: "$product_name" },
+            "brand_name": { $first: "$brand_name" },
+            "number_of_reviews_per_year": { $sum: 1 },
+            "total_reviews_count": { $first: "$reviews_count" }
+        }
+    },
+    {
+        // Faza 9: sortiranje na osnovu samog id proizvoda i onda na osnovu godine
+        $sort: {
+            "_id.product_id": 1,
+            "_id.year": 1
+        }
+    },
+    {
+        // Faza 10: konacni prikaz samih proizvoda i njihovih recenzija u vidu trendova
+        $project: {
+            "_id": 0,
+            "product_id": "$_id.product_id",
+            "year": "$_id.year",
+            "product_name": 1,
+            "brand_name": 1,
+            "total_reviews_count": 1,
+            "number_of_reviews_per_year": 1,
+            "avg_rating": { $round: ["$avg_rating", 4] }
+        }
+    }
+],
+    { allowDiskUse: true });
 ``` 
 
 ### Rezultat upita: 
