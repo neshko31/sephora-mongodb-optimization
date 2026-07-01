@@ -351,10 +351,140 @@ Uočavanje uskih grla:
 ## Upit 4
 
 ### Tekst upita: 
-...
+Analiza najaktivnijih kupaca po brendovima - Koji kupci najčešće pišu recenzije za proizvode istog brenda (5 ili više recenzija za proizvode istog brenda) i da li se njihovo mišljenje o tom brendu (prosečna ocena, procenat preporuke, prosečna korisnost recenzije) razlikuje od proseka svih kupaca tog brenda? Cilj je otkriti stavove aktivnih kupaca i otkriti njihove stavove u ocenjivanju.
 
 ### Kod upita: 
 ``` 
+db.getCollection("reviews").aggregate([
+    {
+        // Faza 1: spajanje recenzija sa samim proizvodima zbog informacija o brendovima
+        $lookup: {
+            from: "product_info",
+            localField: "product_id",
+            foreignField: "product_id",
+            as: "product",
+            pipeline: [
+                {
+                    $project: {
+                        "_id": 0,
+                        "brand_id": 1,
+                        "brand_name": 1
+                    }
+                },
+                { $limit: 1 }
+            ]
+        }
+    },
+    {
+        // Faza 2: uveravanje da product nije prazan ni u jednom slucaju, inace se odbacuje
+        $match: {
+            $expr: { $eq: [{ $size: "$product" }, 1] }
+        }
+    },
+    {
+        // Faza 3: razmotavanje dobijenog product iz niza u jedan json objekat
+        $unwind: "$product"
+    },
+    {
+        // Faza 4: grupisanje recenzija uz kupce i brendove
+        $group: {
+            "_id": {
+                "author_id": "$author_id",
+                "brand_id": "$product.brand_id"
+            },
+            "brand_name": { $first: "$product.brand_name" },
+            "broj_recenzija_za_brend": { $sum: 1 },
+            "prosecna_ocena": { $avg: "$rating" },
+            "broj_preporuka_proizvoda": { $sum: { $cond: ["$is_recommended", 1, 0] } },
+            "prosecna_korisnost": { $avg: "$helpfulness" }
+        }
+    },
+    {
+        // Faza 5: grupisanje po samom brand_name, da otkrijemo koji to brendovi imaju lojalne kupce i koliko u odnosu na obicne
+        $group: {
+            "_id": {
+                "brand_name": "$brand_name",
+                "brand_id": "$_id.brand_id"
+            },
+            "buyers": {
+                $push: {
+                    $cond: {
+                        if: { $gte: ["$broj_recenzija_za_brend", 5] },
+                        then: {
+                            author_id: "$_id.author_id",
+                            broj_recenzija_za_brend: "$broj_recenzija_za_brend",
+                            prosecna_ocena: "$prosecna_ocena",
+                            broj_preporuka_proizvoda: "$broj_preporuka_proizvoda",
+                            prosecna_korisnost: "$prosecna_korisnost"
+                        },
+                        else: "$$REMOVE"
+                    }
+
+                }
+            },
+            "broj_kupaca": { $sum: 1 },
+            "prosek_broj_recenzija_za_brend": { $avg: "$broj_recenzija_za_brend" },
+            "prosecna_ocena_kupaca": { $avg: "$prosecna_ocena" },
+            "broj_preporuka_proizvoda_generalno": { $sum: "$broj_preporuka_proizvoda" },
+            "generalna_prosecna_korisnost": { $avg: "$prosecna_korisnost" },
+            "suma_ocena_lojalnih": {
+                $sum: {
+                    $cond: [{ $gte: ["$broj_recenzija_za_brend", 5] }, "$prosecna_ocena", 0]
+                }
+            },
+            "suma_ocena_prosecnih": {
+                $sum: {
+                    $cond: [{ $gte: ["$broj_recenzija_za_brend", 5] }, 0, "$prosecna_ocena"]
+                }
+            }
+        }
+    },
+    {
+        // Faza 6: prebrojavanje onih zaista lojalnih kupaca
+        $addFields: {
+            "broj_lojalnih_kupaca": { $size: "$buyers" },
+            "prosecna_ocena_lojalnih": {
+                $cond: [
+                    { $eq: [{ $size: "$buyers" }, 0]},
+                    null,
+                    { $divide: ["$suma_ocena_lojalnih", { $size: "$buyers" }]}
+                ]
+            },
+            "prosecna_ocena_prosecnih": {
+                $cond: [
+                    { $eq: [ {$subtract: ["$broj_kupaca", { $size: "$buyers" }]}, 0]},
+                    null,
+                    { $divide: ["$suma_ocena_prosecnih", { $subtract: ["$broj_kupaca", { $size: "$buyers" }] }]}
+                ]
+            }
+        }
+    },
+    {
+        // Faza 7: sortiranje rezultata u opadajucem redosledu broja lojalnih kupaca
+        $sort: {
+            "broj_lojalnih_kupaca": -1,
+            "brand_name": 1
+        }
+    },
+    {
+        // Faza 8: konacni prikaz brendova i njegovih lojalnih korisnika
+        $project: {
+            "_id": 0,
+            "brand_name": "$_id.brand_name",
+            "brand_id": "$_id.brand_id",
+            "buyers": 1,
+            "broj_kupaca": 1,
+            "broj_lojalnih_kupaca": 1,
+            "prosek_broj_recenzija_za_brend": { $round: ["$prosek_broj_recenzija_za_brend", 4] },
+            "prosecna_ocena_kupaca": { $round: ["$prosecna_ocena_kupaca", 4] },
+            "prosecna_ocena_lojalnih": { $round: ["$prosecna_ocena_lojalnih", 4] },
+            "prosecna_ocena_prosecnih" : { $round: ["$prosecna_ocena_prosecnih", 4] },
+            "broj_preporuka_proizvoda_generalno": 1,
+            "generalna_prosecna_korisnost": { $round: ["$generalna_prosecna_korisnost", 4] },
+        }
+    }
+],
+    { allowDiskUse: true });
 ``` 
 
 ### Rezultat upita: 
