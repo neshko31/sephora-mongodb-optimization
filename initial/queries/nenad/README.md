@@ -235,7 +235,7 @@ db.getCollection("product_info").aggregate([
 ![alt text](query2-results.png)
 
 ### Performanse:
-Vreme trajanja upita: 10:39.061
+Vreme trajanja upita: 14:03.262
 
 Uočavanje uskih grla:
 
