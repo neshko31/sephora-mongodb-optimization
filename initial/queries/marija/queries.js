@@ -204,3 +204,62 @@ db.reviews.aggregate([
 
 
 // Upit 5
+db.getCollection("reviews").aggregate([
+  {
+    $match: {
+      "review_text": { 
+        $regex: /free sample|gifted by|incentivized|complimentary|voxbox/i 
+      },
+      "is_recommended": { $exists: true }
+    }
+  },
+  {
+    $group: {
+      "_id": "$product_id",
+      "broj_sponzorisanih_recenzija": { $sum: 1 },
+      "prosecna_ocena_sponzorisanih": { $avg: "$rating" }
+    }
+  },
+  {
+    $match: {
+      "broj_sponzorisanih_recenzija": { $gte: 5 }
+    }
+  },
+  {
+    $lookup: {
+      from: "product_info",
+      localField: "_id",
+      foreignField: "product_id",
+      as: "detalji_proizvoda"
+    }
+  },
+  {
+    $unwind: "$detalji_proizvoda"
+  },
+  {
+    $addFields: {
+      "indeks_pristrasnosti": { 
+        $subtract: ["$prosecna_ocena_sponzorisanih", "$detalji_proizvoda.rating"] 
+      }
+    }
+  },
+  {
+    $match: {
+      "indeks_pristrasnosti": { $gt: 0 }
+    }
+  },
+  {
+    $sort: { "indeks_pristrasnosti": -1 }
+  },
+  {
+    $project: {
+      "_id": 0,
+      "product_name": "$detalji_proizvoda.product_name",
+      "brand_name": "$detalji_proizvoda.brand_name",
+      "organic_site_rating": "$detalji_proizvoda.rating",
+      "sponsored_reviews_count": "$broj_sponzorisanih_recenzija",
+      "sponsored_avg_rating": { $round: ["$prosecna_ocena_sponzorisanih", 2] },
+      "bias_score": { $round: ["$indeks_pristrasnosti", 2] }
+    }
+  }
+], { allowDiskUse: true });

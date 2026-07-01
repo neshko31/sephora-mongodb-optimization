@@ -72,7 +72,7 @@ db.reviews.aggregate([
 Rezultat upita: slika1.1
 
 Performanse:
-- Vreme trajanja upita: 41s
+- Vreme trajanja upita: 38s
 - Uocavanje uskih grla
 - Prikaz explain naredbe - slika1.2
 
@@ -124,7 +124,7 @@ db.reviews.aggregate([
 Rezultat upita: slika2.1
 
 Performanse:
-- Vreme trajanja upita: 3min 18s
+- Vreme trajanja upita: 6min 28s
 - Uocavanje uskih grla
 - Prikaz explain naredbe - slika2.2
 
@@ -192,7 +192,7 @@ db.reviews.aggregate([
 Rezultat upita: slika3.1
 
 Performanse:
-- Vreme trajanja upita:  [ (3min i 40s) x ________  ] s                --- 3min i 40s potrebno za limit od 100 dokumenata
+- Vreme trajanja upita:  [ (4min i 32s) x ________  ] s                --- 4min i 32s potrebno za limit od 100 dokumenata
 - Uocavanje uskih grla
 - Prikaz explain naredbe - slika3.2
 
@@ -247,25 +247,83 @@ db.reviews.aggregate([
 Rezultat upita: slika4.1
 
 Performanse:
-- Vreme trajanja upita: 1min 1s
+- Vreme trajanja upita: 27s
 - Uocavanje uskih grla
 - Prikaz explain naredbe - slika4.2
 
 
 ## Upit 5: 
 
-Tekst upita: Collaborative Filtering - Želimo da grupišemo recenzije prema potpunom profilu autora
-(skin_type + skin_tone + eye_color) i da izračunamo koji proizvodi imaju stopu preporuka
-(is_recommended) preko 90% unutar tog specifičnog mikrotipa.
+Tekst upita: Detekcija plaćenih recenzija - Kao Data Scientist-u koji radi na personalizaciji, moj najveći neprijatelj su plaćene ili 
+sponzorisane recenzije (oni tekstovi koji sadrže napomene "I received this product for free", "Gifted by..."). Ove recenzije veštački podižu 
+ocenu proizvoda i kvare algoritam za preporuke jer ne predstavljaju iskreno mišljenje kupaca.
 
 Kod upita: 
 ``` 
-
+db.getCollection("reviews").aggregate([
+  {
+    $match: {
+      "review_text": { 
+        $regex: /free sample|gifted by|incentivized|complimentary|voxbox/i 
+      },
+      "is_recommended": { $exists: true }
+    }
+  },
+  {
+    $group: {
+      "_id": "$product_id",
+      "broj_sponzorisanih_recenzija": { $sum: 1 },
+      "prosecna_ocena_sponzorisanih": { $avg: "$rating" }
+    }
+  },
+  {
+    $match: {
+      "broj_sponzorisanih_recenzija": { $gte: 5 }
+    }
+  },
+  {
+    $lookup: {
+      from: "product_info",
+      localField: "_id",
+      foreignField: "product_id",
+      as: "detalji_proizvoda"
+    }
+  },
+  {
+    $unwind: "$detalji_proizvoda"
+  },
+  {
+    $addFields: {
+      "indeks_pristrasnosti": { 
+        $subtract: ["$prosecna_ocena_sponzorisanih", "$detalji_proizvoda.rating"] 
+      }
+    }
+  },
+  {
+    $match: {
+      "indeks_pristrasnosti": { $gt: 0 }
+    }
+  },
+  {
+    $sort: { "indeks_pristrasnosti": -1 }
+  },
+  {
+    $project: {
+      "_id": 0,
+      "product_name": "$detalji_proizvoda.product_name",
+      "brand_name": "$detalji_proizvoda.brand_name",
+      "organic_site_rating": "$detalji_proizvoda.rating",
+      "sponsored_reviews_count": "$broj_sponzorisanih_recenzija",
+      "sponsored_avg_rating": { $round: ["$prosecna_ocena_sponzorisanih", 2] },
+      "bias_score": { $round: ["$indeks_pristrasnosti", 2] }
+    }
+  }
+], { allowDiskUse: true });
 ```
 
 Rezultat upita: slika5.1
 
 Performanse:
-- Vreme trajanja upita: s
+- Vreme trajanja upita: 36s
 - Uocavanje uskih grla
 - Prikaz explain naredbe - slika5.2
