@@ -103,8 +103,8 @@ db.getCollection("product_info").aggregate([
 ![alt text](query1-results.png)
 
 ### Performanse:
-Vreme trajanja upita: 10:39.061
-- Napomena: Ovakav kod koji je dostupan, sadrži i dodatnu *$limit: 500* etapu koja će biti obrisana kad se bude radilo nad optimizovanom verzijom. Ta etapa je dodata iz razloga što je trajanje upita bez nje prešlo trajanje od 5 sati, ali se upit još uvek nije izvršio!
+Vreme trajanja upita: 14:23.495
+- Napomena: Ovakav kod koji je dostupan, sadrži i dodatnu *$limit: 500* etapu koja će biti obrisana kad se bude radilo nad optimizovanom verzijom. Ta etapa je dodata iz razloga što je trajanje upita bez nje prešlo trajanje od 5 sati, ali se upit još uvek nije izvršio i tad je izvršavanje prekinuto!
 
 Uočavanje uskih grla:
 
