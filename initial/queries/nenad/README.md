@@ -503,7 +503,7 @@ Uočavanje uskih grla:
 ## Upit 5
 
 ### Tekst upita: 
-...
+Analiza odnosa cene i percepcije vrednosti - Da li proizvodi u različitim cenovnim rangovima (budget, mid, premium, luxury) unutar primarne kategorije 'Skincare' iz iste sekundarne kategorije nose i proporcionalnu veću vrednost za kupca (izraženu kao loves_count i rating u odnosu na cenu) ili jeftiniji proizvodi nude bolji odnos cene i kvaliteta u odnosu na skuplje verzije?
 
 ### Kod upita: 
 ``` 
