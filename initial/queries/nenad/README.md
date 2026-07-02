@@ -492,7 +492,7 @@ db.getCollection("reviews").aggregate([
 ![alt text](query4-results.png)
 
 ### Performanse:
-Vreme trajanja upita: 10:39.061
+Vreme trajanja upita: 1:16:21.069
 
 Uočavanje uskih grla:
 
