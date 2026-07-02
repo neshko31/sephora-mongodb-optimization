@@ -507,6 +507,137 @@ Analiza odnosa cene i percepcije vrednosti - Da li proizvodi u različitim cenov
 
 ### Kod upita: 
 ``` 
+db.getCollection("product_info").aggregate([
+    {
+        // Faza 1: izdvajanje samo Skincare proizvoda iz razloga sto su recenzije u skupu samo za njih vezane
+        $match: { "primary_category": "Skincare" }
+    },
+    {
+        // Faza 2: kreiranje polja koje ce se koristiti za odredjivanje pripadnosti kategoriji
+        $addFields: {
+            "cenovna_kategorija": {
+                $switch: {
+                    branches: [
+                        { case: { $lt: ["$price_usd", 25] }, then: "Budget" },
+                        { case: { $and: [{ $gte: ["$price_usd", 25] }, { $lt: ["$price_usd", 50] }] }, then: "Mid" },
+                        { case: { $and: [{ $gte: ["$price_usd", 50] }, { $lt: ["$price_usd", 100] }] }, then: "Premium" },
+                        { case: { $gte: ["$price_usd", 100] }, then: "Luxury" },
+
+                    ],
+                    default: "Standard"
+                }
+            }
+        }
+    },
+    {
+        $limit: 10
+    },
+    {
+        // Faza 3: spajanje sa reviews kolekcijom kako bismo imali potrebne podatke za kasnije
+        $lookup: {
+            from: "reviews",
+            localField: "product_id",
+            foreignField: "product_id",
+            as: "product_reviews",
+            pipeline: [
+                {
+                    $project: {
+                        "_id": 1,
+                        "submission_time": 1,
+                        "rating": 1,
+                        "total_neg_feedback_count": 1,
+                        "total_pos_feedback_count": 1
+                    }
+                }
+            ]
+        }
+    },
+    {
+        // Faza 4: garantovanje da sami vec izvuceni proizvodi imaju recenzije
+        $match: {
+            $expr: { $gt: [{ $size: "$product_reviews" }, 0] }
+        }
+    },
+    {
+        // Faza 5: rastavljanje na zasebne dokumente kako bi se moglo kasnije uraditi grupisanje
+        $unwind: "$product_reviews"
+    },
+    {
+        // Faza 6: dodavanje tezine svakoj recenziji i izvlacenje godine kad je nastala recenzija
+        $addFields: {
+            "review_weight": { $add: [1, { $subtract: ["$product_reviews.total_pos_feedback_count", "$product_reviews.total_neg_feedback_count"] }] },
+            "review_rating": "$product_reviews.rating"
+        }
+    },
+    {
+        // Faza 7: grupisanje i racunanje ponderisanog proseka ocena po godini
+        $group: {
+            "_id": {
+                "product_id": "$product_id"
+            },
+            "suma_ponderisanih": { $sum: { $multiply: ["$review_rating", "$review_weight"] } },
+            "suma_tezina": { $sum: "$review_weight" },
+            "broj_ocena": { $sum: 1 },
+            "secondary_category": { $first: "$secondary_category" },
+            "cenovna_kategorija": { $first: "$cenovna_kategorija" },
+            "loves_count": { $first: "$loves_count"},
+            "staticka_ocena": { $first: "$rating" },
+            "price_usd": { $first: "$price_usd" },
+            "reviews_count": { $first: "$reviews"}
+        }
+    },
+    {
+        // Faza 8: racunanje ponderisane prosecne ocene
+        $addFields: {
+            "ponderisana_prosecna_ocena": { $divide: ["$suma_ponderisanih", "$suma_tezina"]}
+        }
+    },
+    {
+        // Faza 9: grupisanje proizvoda po sekundardnim i cenovnim kategorijama
+        $group: {
+            "_id": {
+                "secondary_category": "$secondary_category",
+                "cenovna_kategorija": "$cenovna_kategorija"
+            },
+            "broj_proizvoda": { $sum: 1 },
+            "ponderisana_prosecna_ocena": { $avg: "$ponderisana_prosecna_ocena" },
+            "staticka_prosecna_ocena": { $avg: "$staticka_ocena" },
+            "prosecan_loves_count": { $avg: "$loves_count" },
+            "prosecna_cena": { $avg: "$price_usd" },
+            "reviews_number": { $sum: "$reviews_count" }
+        }
+    }, 
+    {
+        // Faza 10: izvedene metrike za racunanje procenjenog 'value' samih proizvoda
+        $addFields: {
+            "loves_po_dolaru": { $divide: ["$prosecan_loves_count", "$prosecna_cena"] },
+            "razlika_ocena": { $subtract: ["$staticka_prosecna_ocena", "$ponderisana_prosecna_ocena"]}
+        }
+    },
+    {
+        // Faza 11: sortiranje po samim kategorijama 
+        $sort: {
+            "secondary_category": 1,
+            "cenovna_kategorija": 1
+        }
+    },
+    {
+        // Faza 12: ispis rezultata
+        $project: {
+            "_id": 0,
+            "secondary_category": "$_id.secondary_category",
+            "cenovna_kategorija": "$_id.cenovna_kategorija",
+            "broj_proizvoda": 1,
+            "ponderisana_prosecna_ocena": { $round:["$ponderisana_prosecna_ocena", 4]},
+            "staticka_prosecna_ocena": { $round:["$staticka_prosecna_ocena", 4]},
+            "prosecan_loves_count": { $round:["$prosecan_loves_count", 4]},
+            "prosecna_cena": { $round:["$prosecna_cena", 4]},
+            "reviews_number": 1,
+            "loves_po_dolaru": { $round:["$loves_po_dolaru", 4]},
+            "razlika_ocena": { $round:["$razlika_ocena", 4]},
+        }
+    }
+]);
 ``` 
 
 ### Rezultat upita: 
